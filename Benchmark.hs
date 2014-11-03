@@ -35,10 +35,10 @@ baseSpace spc = And [
                ]
 
 binarySpace :: [String] -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-binarySpace bins spc = And [ Or [Set NoMeaning (RuntimeParam $ "bin" ++ ":" ++ bin), spc] | bin <- bins ]
+binarySpace bins spc = Or [ And [Set NoMeaning (RuntimeParam $ "bin" ++ ":" ++ bin), spc] | bin <- bins ]
 
 processSpace :: Int -> BenchSpace DefaultParamMeaning
-processSpace n = And [Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..n]]]
+processSpace n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..n]]
 
 addBuildMethods :: Config -> Config
 addBuildMethods c = c {buildMethods = [hdphMethod]
