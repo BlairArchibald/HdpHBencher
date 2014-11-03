@@ -15,6 +15,9 @@ home      = "/users/grad/blair"
 hdphRepo  = "git@github.com:BlairArchibald/HdpH.git"
 hdphLocal = "/users/grad/blair/HdpHBencher/HdpH"
 
+maxProcs  = 4
+binList   = ["hello"]
+
 main :: IO ()
 main = do 
   putStrLn "Starting Benchmarking"
@@ -22,15 +25,20 @@ main = do
   defaultMainModifyConfig $ addBuildMethods . addBenchmarks benches 
 
 benches :: [Benchmark DefaultParamMeaning]
-benches = [mkBenchmark (hdphLocal ++ "/hdph-0.2.2/") [] argSpace]
+benches = [mkBenchmark (hdphLocal ++ "/hdph-0.2.2/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
 
-argSpace :: BenchSpace DefaultParamMeaning
-argSpace = And [
-		Set NoMeaning (CompileParam "--flags=WithMPI")
+baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
+baseSpace spc = And [
+                Set NoMeaning (CompileParam "--flags=WithMPI")
                ,Set NoMeaning (RuntimeParam "hostFile:hosts")
-               ,Set NoMeaning (RuntimeParam "numProcs:3")
-               ,Set NoMeaning (RuntimeParam "bin:hello")
+               ,spc
                ]
+
+binarySpace :: [String] -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
+binarySpace bins spc = And [ Or [Set NoMeaning (RuntimeParam $ "bin" ++ ":" ++ bin), spc] | bin <- bins ]
+
+processSpace :: Int -> BenchSpace DefaultParamMeaning
+processSpace n = And [Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..n]]]
 
 addBuildMethods :: Config -> Config
 addBuildMethods c = c {buildMethods = [hdphMethod]
