@@ -1,19 +1,23 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- Main benchmark runner.
 --
 -- Author: Blair Archibald
 --
 
 import HSBencher
+import HSBencher.Backend.Dribble
+
 import HdpHMethod
 
 import System.Process (callCommand)
 import System.Directory
 
+import Data.Monoid ((<>))
 import Data.Map as M
 
-home      = "/users/grad/blair"
-hdphRepo  = "git@github.com:BlairArchibald/HdpH.git"
-hdphLocal = "/users/grad/blair/HdpHBencher/HdpH"
+import qualified Data.Configurator as Conf
+import Data.Configurator (Worth(..))
 
 maxProcs  = 4
 binList   = ["hello"]
@@ -21,11 +25,20 @@ binList   = ["hello"]
 main :: IO ()
 main = do 
   putStrLn "Starting Benchmarking"
-  grabRepository hdphRepo hdphLocal
-  defaultMainModifyConfig $ addBuildMethods . addBenchmarks benches 
+
+  cfg <- Conf.load [Required "benchmark.conf"]
+  putStrLn "Using config:"
+  Conf.display cfg
+
+  getRepository cfg
+
+  defaultMainModifyConfig $ (addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv")) . addHarvesters . addBuildMethods . addBenchmarks benches
+    where getRepository cfg = do r <- Conf.require cfg "hdphRepo"
+                                 l <- Conf.require cfg "hdphInstallLoc"
+                                 downloadRepository r l
 
 benches :: [Benchmark DefaultParamMeaning]
-benches = [mkBenchmark (hdphLocal ++ "/hdph-0.2.2/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
+benches = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
 
 baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace spc = And [
@@ -42,7 +55,7 @@ processSpace n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (p
 
 addBuildMethods :: Config -> Config
 addBuildMethods c = c {buildMethods = [hdphMethod]
-                      ,doClean      = False
+                      ,doClean      = True
                       -- Slight hack to pass the local install information into the sandbox compile stage.
                       ,pathRegistry = pathRegistry c `M.union` pathReg
                       }
@@ -50,15 +63,18 @@ addBuildMethods c = c {buildMethods = [hdphMethod]
                              -- Don't like how this is hardcoded - Either read
                              -- from a file or try and do it relative?
                              -- Probably do some form of intersperse function to make this neat.
-                              ("extra-packages",(hdphLocal ++ "/hdph-mpi-allgather-0.0.2/ --flags=libMPICH2 --extra-include-dirs=" 
+                              ("extra-packages",(hdphLocal ++ "/hdph-mpi-allgather/ --flags=libMPICH2 --extra-include-dirs=" 
                               ++ (home ++ "/mpich/include") ++ " --extra-lib-dirs=" ++ (home ++ "/mpich/lib") 
-                              ++ ":" ++ (hdphLocal ++ "/hdph-closure-0.2.0/")))
+                              ++ ":" ++ (hdphLocal ++ "/hdph-closure/")))
                              ]
+
+addHarvesters :: Config -> Config
+addHarvesters conf = conf { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters conf }
 
 -- TODO: Possibly check the gitref that way we can avoid destroying all sandbox
 -- dirs and starting fresh.
-grabRepository :: String -> FilePath -> IO ()
-grabRepository rep loc = do
+downloadRepository :: String -> FilePath -> IO ()
+downloadRepository rep loc = do
   e <- doesDirectoryExist loc
   case e of 
     True  -> putStrLn ("Removing existing repository at " ++ loc) >> removeDirectoryRecursive loc
