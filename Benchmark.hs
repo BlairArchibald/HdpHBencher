@@ -21,31 +21,34 @@ import Data.ConfigFile
 
 import Data.Either.Utils
 
-
-maxProcs  = 3
-binList   = ["sumeuler"]
-
 main :: IO ()
 main = do 
   putStrLn "Starting Benchmarking"
 
+  -- Read in user config
   r <- Conf.readfile emptyCP{optionxform = id
                             ,accessfunc  = interpolatingAccess 10
                             } "benchmark.conf"
   let cfg = forceEither r
+  putStrLn "Using config: " >> putStrLn (Conf.to_string cfg)
 
-  putStrLn "Using config:" >> putStrLn (Conf.to_string cfg)
-
+  -- Download the code under test.
   getRepository cfg
 
-  let l = forceEither $ get cfg "DEFAULT" "hdphInstallLoc"
-  defaultMainModifyConfig $ (addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv")) . addHarvesters . (addBuildMethods $ buildPathReg cfg) . addBenchmarks (benches l)
-    where getRepository cfg = let r = forceEither $ get cfg "DEFAULT" "hdphRepo"
-                                  l = forceEither $ get cfg "DEFAULT" "hdphInstallLoc"
+  -- Run the benchmarks.
+  defaultMainModifyConfig $ configureBenchmarkSpace cfg
+
+    where getRepository cfg = let r = forceConfigGet cfg "DEFAULT" "hdphRepo"
+                                  l = forceConfigGet cfg "DEFAULT" "hdphInstallLoc"
                               in downloadRepository r l
 
-benches :: String -> [Benchmark DefaultParamMeaning]
-benches hdphLocal = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
+configureBenchmarkSpace :: ConfigParser -> Config -> Config
+configureBenchmarkSpace cfg c = addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv") . addHarvesters . (addBuildMethods $ buildPathReg cfg) . addBenchmarks (benches hdphLocal 0 [])
+  where hdphLocal  = forceConfigGet cfg "DEFAULT" "hdphInstallLoc"
+        dribbleLoc = forceConfigGet cfg "DEFAULT" "resultsCsv"
+
+benches :: String -> Int -> [String] -> [Benchmark DefaultParamMeaning]
+benches hdphLocal maxProcs binList = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
 
 baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace spc = And [
@@ -70,14 +73,12 @@ addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
                       }
 
 buildPathReg :: ConfigParser -> Map String String
-buildPathReg cfg = let a = forceEither $ get cfg "DEFAULT" "installArgs"
+buildPathReg cfg = let a = forceConfigGet cfg "DEFAULT" "installArgs"
                    in  M.fromList [("extra-packages",a)]
 
 addHarvesters :: Config -> Config
 addHarvesters conf = conf { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters conf }
 
--- TODO: Possibly check the gitref that way we can avoid destroying all sandbox
--- dirs and starting fresh.
 downloadRepository :: String -> FilePath -> IO ()
 downloadRepository rep loc = do
   e <- doesDirectoryExist loc
@@ -86,3 +87,6 @@ downloadRepository rep loc = do
     False -> return ()
 
   callCommand $ "git clone " ++ rep ++ " " ++ loc
+
+forceConfigGet :: Get_C a => ConfigParser -> SectionSpec -> OptionSpec -> a
+forceConfigGet cfg sec opt = forceEither $ get cfg sec opt 
