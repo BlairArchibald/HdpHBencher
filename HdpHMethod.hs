@@ -83,6 +83,7 @@ hdphMethod = BuildMethod
        -- do this.
        let runit args envVars =
              let bin   = tmpdir </> lookupArg "bin" args ++ suffix
+		 prog_args  = lookupArg "args" args
                  hosts = benchroot </> lookupArg "hostFile" args
                  numProcs = lookupArg "numProcs" args
               in CommandDescr
@@ -90,7 +91,7 @@ hdphMethod = BuildMethod
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
                 command = ShellCommand 
                             ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " " 
-                            ++ bin ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1 -HdpH")
+                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1  debug=9 -HdpH")
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir

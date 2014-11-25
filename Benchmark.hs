@@ -19,8 +19,8 @@ import Data.Map as M
 import qualified Data.Configurator as Conf
 import Data.Configurator (Worth(..))
 
-maxProcs  = 4
-binList   = ["hello"]
+maxProcs  = 3
+binList   = ["sumeuler"]
 
 main :: IO ()
 main = do 
@@ -32,18 +32,23 @@ main = do
 
   getRepository cfg
 
-  defaultMainModifyConfig $ (addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv")) . addHarvesters . addBuildMethods . addBenchmarks benches
+  pathReg <- buildPathReg cfg
+  l <- Conf.require cfg "hdphInstallLoc"
+
+  defaultMainModifyConfig $ (addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv")) . addHarvesters . (addBuildMethods pathReg) . addBenchmarks (benches l)
     where getRepository cfg = do r <- Conf.require cfg "hdphRepo"
                                  l <- Conf.require cfg "hdphInstallLoc"
                                  downloadRepository r l
 
-benches :: [Benchmark DefaultParamMeaning]
-benches = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
+benches :: String -> [Benchmark DefaultParamMeaning]
+benches hdphLocal = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
 
 baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace spc = And [
                 Set NoMeaning (CompileParam "--flags=WithMPI")
                ,Set NoMeaning (RuntimeParam "hostFile:hosts")
+		--quick hack for now
+               ,Set NoMeaning (RuntimeParam "args:v2") 
                ,spc
                ]
 
@@ -53,20 +58,16 @@ binarySpace bins spc = Or [ And [Set NoMeaning (RuntimeParam $ "bin" ++ ":" ++ b
 processSpace :: Int -> BenchSpace DefaultParamMeaning
 processSpace n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..n]]
 
-addBuildMethods :: Config -> Config
-addBuildMethods c = c {buildMethods = [hdphMethod]
+addBuildMethods :: Map String String -> Config -> Config
+addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
                       ,doClean      = True
                       -- Slight hack to pass the local install information into the sandbox compile stage.
                       ,pathRegistry = pathRegistry c `M.union` pathReg
                       }
-  where pathReg = M.fromList [
-                             -- Don't like how this is hardcoded - Either read
-                             -- from a file or try and do it relative?
-                             -- Probably do some form of intersperse function to make this neat.
-                              ("extra-packages",(hdphLocal ++ "/hdph-mpi-allgather/ --flags=libMPICH2 --extra-include-dirs=" 
-                              ++ (home ++ "/mpich/include") ++ " --extra-lib-dirs=" ++ (home ++ "/mpich/lib") 
-                              ++ ":" ++ (hdphLocal ++ "/hdph-closure/")))
-                             ]
+
+--buildPathReg :: Conf.Config -> IO Map String String
+buildPathReg cfg = do a <- Conf.require cfg "installArgs"
+		      return $ M.fromList [("extra-packages",a)]
 
 addHarvesters :: Config -> Config
 addHarvesters conf = conf { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters conf }
