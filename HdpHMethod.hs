@@ -82,10 +82,10 @@ hdphMethod = BuildMethod
        -- could pass these in as a map but HsBencher isn't currently set up to
        -- do this.
        let runit args envVars =
-             let bin   = tmpdir </> lookupArg "bin" args ++ suffix
-		 prog_args  = lookupArg "args" args
-                 hosts = benchroot </> lookupArg "hostFile" args
-                 numProcs = lookupArg "numProcs" args
+             let bin       = tmpdir </> lookupArg "bin" args ++ suffix
+                 prog_args = lookupArg "args" args
+                 hosts     = benchroot </> lookupArg "hostFile" args
+                 numProcs  = lookupArg "numProcs" args
               in CommandDescr
                {
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.

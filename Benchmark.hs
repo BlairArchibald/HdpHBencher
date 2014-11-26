@@ -14,12 +14,14 @@ import System.Process (callCommand)
 import System.Directory
 
 import Data.Monoid ((<>))
-import Data.Map as M
+import qualified Data.Map as M
 
 import qualified Data.ConfigFile as Conf
 import Data.ConfigFile
 
 import Data.Either.Utils
+
+import Data.List.Split (splitOn)
 
 main :: IO ()
 main = do 
@@ -43,41 +45,48 @@ main = do
                               in downloadRepository r l
 
 configureBenchmarkSpace :: ConfigParser -> Config -> Config
-configureBenchmarkSpace cfg c = addPlugin defaultDribblePlugin (DribbleConf $ Just "./dribble.csv") . addHarvesters . (addBuildMethods $ buildPathReg cfg) . addBenchmarks (benches hdphLocal 0 [])
-  where hdphLocal  = forceConfigGet cfg "DEFAULT" "hdphInstallLoc"
-        dribbleLoc = forceConfigGet cfg "DEFAULT" "resultsCsv"
+configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (buildPathReg cfg) . addBenchmarks (configureBenches cfg)
+  where dribbleLoc = forceConfigGet cfg "DEFAULT" "resultsCsv"
+        addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
+        addHarvesters c = c { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters c }
 
-benches :: String -> Int -> [String] -> [Benchmark DefaultParamMeaning]
-benches hdphLocal maxProcs binList = [mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace binList $ processSpace maxProcs)]
+configureBenches :: ConfigParser -> [Benchmark DefaultParamMeaning]
+configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
+  where hdphLocal    = forceConfigGet cfg "DEFAULT" "hdphInstallLoc"
+        benchmarkList= splitOn "," $ forceConfigGet cfg "DEFAULT" "benchmarks"
+        -- Might actually be easier to do strong scaling here. We can use args
+        -- if we have lots of small spaces rather than one big one?
+        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ binarySpace cfg n $ argSpace cfg n $ processSpace cfg n) : acc
 
 baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace spc = And [
                 Set NoMeaning (CompileParam "--flags=WithMPI")
                ,Set NoMeaning (RuntimeParam "hostFile:hosts")
-               --quick hack for now
-               ,Set NoMeaning (RuntimeParam "args:v2") 
                ,spc
                ]
 
-binarySpace :: [String] -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-binarySpace bins spc = Or [ And [Set NoMeaning (RuntimeParam $ "bin" ++ ":" ++ bin), spc] | bin <- bins ]
+argSpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
+argSpace cfg n spc = Or [spc]
 
-processSpace :: Int -> BenchSpace DefaultParamMeaning
-processSpace n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..n]]
+binarySpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
+binarySpace cfg n spc = Or [ And [Set NoMeaning (RuntimeParam $ "bin:" ++ bin), spc] ]
+  where bin = forceConfigGet cfg n "name"
 
-addBuildMethods :: Map String String -> Config -> Config
+--Doesn't currently scale threads. How do I handle this?
+processSpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning
+processSpace cfg n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..maxProcs]]
+  where maxProcs = forceConfigGet cfg n "maxProcs" :: Int
+
+addBuildMethods :: M.Map String String -> Config -> Config
 addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
                       ,doClean      = True
                       -- Slight hack to pass the local install information into the sandbox compile stage.
                       ,pathRegistry = pathRegistry c `M.union` pathReg
                       }
 
-buildPathReg :: ConfigParser -> Map String String
+buildPathReg :: ConfigParser -> M.Map String String
 buildPathReg cfg = let a = forceConfigGet cfg "DEFAULT" "installArgs"
                    in  M.fromList [("extra-packages",a)]
-
-addHarvesters :: Config -> Config
-addHarvesters conf = conf { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters conf }
 
 downloadRepository :: String -> FilePath -> IO ()
 downloadRepository rep loc = do
