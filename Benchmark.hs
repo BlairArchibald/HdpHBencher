@@ -21,13 +21,14 @@ import qualified Data.Configurator as Conf
 import qualified Data.Configurator.Types as Conf
 
 import Data.Maybe
+import qualified Data.Text as T
 
 import Data.List.Split (splitOn)
 
 type ConfMap = HM.HashMap Conf.Name Conf.Value
 
 main :: IO ()
-main = do 
+main = do
   putStrLn "Starting Benchmarking"
 
   -- Read in user config
@@ -56,9 +57,9 @@ configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (bui
 
 configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
-  where hdphLocal    = getStringOrNothing cfg "hdphInstallLoc" 
-        benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [String]
-        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ And []) : acc -- $ binarySpace cfg n $ argSpace cfg n $ processSpace cfg n) : acc
+  where hdphLocal    = getStringOrNothing cfg "hdphInstallLoc"
+        benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
+        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ generateBenchmarkSpaces cfg n) : acc
 
 baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace spc = And [
@@ -67,17 +68,18 @@ baseSpace spc = And [
                ,spc
                ]
 
-{- argSpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-argSpace cfg n spc = Or [spc]
-
-binarySpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-binarySpace cfg n spc = Or [ And [Set NoMeaning (RuntimeParam $ "bin:" ++ bin), spc] ]
-  where bin = forceConfigGet cfg n "name"
-
---Doesn't currently scale threads. How do I handle this?
-processSpace :: ConfigParser -> String -> BenchSpace DefaultParamMeaning
-processSpace cfg n = Or [ Set NoMeaning (RuntimeParam $ "numProcs" ++ ":" ++ show (proc)) | proc <- [1..maxProcs]]
-  where maxProcs = forceConfigGet cfg n "maxProcs" :: Int -}
+generateBenchmarkSpaces :: ConfMap -> T.Text -> BenchSpace DefaultParamMeaning
+generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++ binName)
+                                        ,Or genArgs
+                                        ]
+  where binName = getStringOrNothing cfg $ bname `T.append` ".name"
+        genArgs = foldl createSpaces [] $ getArgs
+        getArgs = fromMaybe [[]] $ Conf.convert $ cfg HM.! (bname `T.append` ".args")
+        createSpaces acc (a:p:[]) = (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
+                                      ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
+                                      ]
+                                 ): acc
+        createSpaces acc _ = (And []) : acc
 
 addBuildMethods :: M.Map String String -> Config -> Config
 addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
@@ -92,7 +94,7 @@ buildPathReg cfg = M.fromList [("extra-packages", getStringOrNothing cfg "instal
 downloadRepository :: String -> FilePath -> IO ()
 downloadRepository rep loc = do
   e <- doesDirectoryExist loc
-  case e of 
+  case e of
     True  -> putStrLn ("Removing existing repository at " ++ loc) >> removeDirectoryRecursive loc
     False -> return ()
 
@@ -101,4 +103,3 @@ downloadRepository rep loc = do
 -- Config Helper functions.
 getStringOrNothing :: ConfMap -> Conf.Name -> String
 getStringOrNothing cfg s = fromMaybe "" $ Conf.convert $ cfg HM.! s
-

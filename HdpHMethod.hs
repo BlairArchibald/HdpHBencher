@@ -89,8 +89,8 @@ hdphMethod = BuildMethod
               in CommandDescr
                {
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
-                command = ShellCommand 
-                            ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " " 
+                command = ShellCommand
+                            ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " "
                             ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1  debug=9 -HdpH")
                ,envVars = envVars
                ,timeout = runTimeOut
