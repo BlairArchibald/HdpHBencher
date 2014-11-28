@@ -36,7 +36,6 @@ main = do
 
   Conf.display cfg
 
-
   -- Download the code under test.
   -- getRepository cfg
 
@@ -59,14 +58,16 @@ configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
   where hdphLocal    = getStringOrNothing cfg "hdphInstallLoc"
         benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
-        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace $ generateBenchmarkSpaces cfg n) : acc
+        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
 
-baseSpace :: BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-baseSpace spc = And [
-                Set NoMeaning (CompileParam "--flags=WithMPI")
-               ,Set NoMeaning (RuntimeParam "hostFile:hosts")
-               ,spc
-               ]
+baseSpace :: ConfMap -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
+baseSpace cfg spc = if useMPI then And [ Set NoMeaning (CompileParam "--flags=WithMPI")
+                                       , Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
+                                       ,spc
+                                       ]
+                              else And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile)) ]
+  where useMPI = fromMaybe False   $ Conf.convert $ cfg HM.! "useMPI"
+        hfile  = fromMaybe "hosts" $ Conf.convert $ cfg HM.! "hostFile"
 
 generateBenchmarkSpaces :: ConfMap -> T.Text -> BenchSpace DefaultParamMeaning
 generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++ binName)
@@ -76,9 +77,9 @@ generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++
         genArgs = foldl createSpaces [] $ getArgs
         getArgs = fromMaybe [[]] $ Conf.convert $ cfg HM.! (bname `T.append` ".args")
         createSpaces acc (a:p:[]) = (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
-                                      ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
-                                      ]
-                                 ): acc
+                                         ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
+                                         ]
+                                    ): acc
         createSpaces acc _ = (And []) : acc
 
 addBuildMethods :: M.Map String String -> Config -> Config
