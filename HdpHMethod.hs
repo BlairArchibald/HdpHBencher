@@ -27,7 +27,6 @@ hdphMethod = BuildMethod
   , canBuild = dotcab `PredOr` InDirectoryWithExactlyOne dotcab
   , concurrentBuild = True
 
-  --TODO: Use this to set the number of processes rather than threads.
   , setThreads = Just $ \n -> [ CompileParam "--ghc-option='-threaded' --ghc-option='-rtsopts'"
                               , RuntimeParam ("+RTS -N"++ show n++" -RTS")]
 
@@ -86,12 +85,14 @@ hdphMethod = BuildMethod
                  prog_args = lookupArg "args" args
                  hosts     = benchroot </> lookupArg "hostFile" args
                  numProcs  = lookupArg "numProcs" args
+                 threads   = lookupArg "numThreads" args
               in CommandDescr
                {
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
                 command = ShellCommand
                             ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " "
-                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1  debug=9 -HdpH")
+                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1  debug=9 -HdpH +RTS -N "
+                            ++ threads ++ " -RTS")
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir

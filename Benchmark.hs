@@ -76,10 +76,12 @@ generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++
   where binName = getStringOrNothing cfg $ bname `T.append` ".name"
         genArgs = foldl createSpaces [] $ getArgs
         getArgs = fromMaybe [[]] $ Conf.convert $ cfg HM.! (bname `T.append` ".args")
-        createSpaces acc (a:p:[]) = (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
-                                         ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
-                                         ]
-                                    ): acc
+        createSpaces acc (a:p:t:[]) = let threads = fromMaybe 0 $ Conf.convert t :: Int in
+                                      (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
+                                           ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
+                                           ,Set (Threads threads) (RuntimeParam $ "numThreads: " ++ (show $ threads))
+                                           ]
+                                      ): acc
         createSpaces acc _ = (And []) : acc
 
 addBuildMethods :: M.Map String String -> Config -> Config
