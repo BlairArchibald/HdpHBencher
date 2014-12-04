@@ -91,8 +91,8 @@ hdphMethod = BuildMethod
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
                 command = ShellCommand
                             ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " "
-                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1  debug=9 -HdpH +RTS -N "
-                            ++ threads ++ " -RTS")
+                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1 -HdpH "
+			    ++ "+RTS -N" ++ threads ++ " -RTS")
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir
@@ -104,7 +104,7 @@ hdphMethod = BuildMethod
  where
    dotcab = WithExtension ".cabal"
    tag = " [HdpHMethod] "
-   lookupArg a args = stripColon . head $ filter (\f -> f =~ (a ++ ":.*") :: Bool) args
+   lookupArg a args = trim . stripColon . head $ filter (\f -> f =~ (a ++ ":.*") :: Bool) args
    stripColon s = let (b,w,a) = s =~ ":" :: (String,String,String) in a
 
 --------------------------------------------------------------------------------
@@ -159,3 +159,6 @@ runSuccessful tag cmd = do
     ExitError code  -> error$ "expected this command to succeed! But it exited with code "++show code++ ":\n  "++ cmd
     RunTimeOut {}   -> error$ "Methods.hs/runSuccessful - error! The following command timed out:\n  "++show cmd
     RunCompleted {} -> return lns
+
+trim :: String -> String
+trim = unwords . words
