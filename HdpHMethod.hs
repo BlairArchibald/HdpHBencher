@@ -86,13 +86,14 @@ hdphMethod = BuildMethod
                  hosts     = benchroot </> lookupArg "hostFile" args
                  numProcs  = lookupArg "numProcs" args
                  threads   = lookupArg "numThreads" args
+                 interface = lookupArg "interface" args
               in CommandDescr
                {
                 --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
                 command = ShellCommand
-                            ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " "
-                            ++ bin ++ " " ++ prog_args ++ " +HdpH numProcs=" ++ numProcs ++ " nic=p1p1 -HdpH "
-			    ++ "+RTS -N" ++ threads ++ " -RTS")
+                            ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " " ++ bin ++ " " ++ prog_args
+                            ++ " +HdpH numProcs=" ++ numProcs ++ " nic=" ++ interface ++ " -HdpH "
+                            ++ "+RTS -N" ++ threads ++ " -RTS")
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir
