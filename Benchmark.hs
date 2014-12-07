@@ -34,10 +34,8 @@ main = do
   -- Read in user config
   cfg <- Conf.load [Conf.Required "benchmark.conf"]
 
-  Conf.display cfg
-
   -- Download the code under test.
-  -- getRepository cfg
+  getRepository cfg
 
   confMap <- Conf.getMap cfg
 
@@ -52,7 +50,8 @@ configureBenchmarkSpace :: ConfMap -> Config -> Config
 configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (buildPathReg cfg) . addBenchmarks (configureBenches cfg)
   where dribbleLoc = getStringOrNothing cfg "resultsCsv"
         addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
-        addHarvesters c = c { harvesters = customTagHarvesterDouble "RUNPARIOTIME" <> harvesters c }
+        addHarvesters c = c { harvesters =  customTagHarvesterDouble "Runtime"
+                                         <> harvesters c }
 
 configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
@@ -63,11 +62,15 @@ configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
 baseSpace :: ConfMap -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace cfg spc = if useMPI then And [ Set NoMeaning (CompileParam "--flags=WithMPI")
                                        , Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
+                                       , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
                                        ,spc
                                        ]
-                              else And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile)) ]
-  where useMPI = fromMaybe False   $ Conf.convert $ cfg HM.! "useMPI"
-        hfile  = fromMaybe "hosts" $ Conf.convert $ cfg HM.! "hostFile"
+                              else And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
+                                       , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
+                                       ]
+  where useMPI     = fromMaybe False   $ Conf.convert $ cfg HM.! "useMPI"
+        hfile      = fromMaybe "hosts" $ Conf.convert $ HM.lookupDefault (Conf.String "hosts") "hostFile"  cfg
+        interface  = fromMaybe "eth0"  $ Conf.convert $ HM.lookupDefault (Conf.String "eth0")  "interface" cfg
 
 generateBenchmarkSpaces :: ConfMap -> T.Text -> BenchSpace DefaultParamMeaning
 generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++ binName)
@@ -76,10 +79,12 @@ generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++
   where binName = getStringOrNothing cfg $ bname `T.append` ".name"
         genArgs = foldl createSpaces [] $ getArgs
         getArgs = fromMaybe [[]] $ Conf.convert $ cfg HM.! (bname `T.append` ".args")
-        createSpaces acc (a:p:[]) = (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
-                                         ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
-                                         ]
-                                    ): acc
+        createSpaces acc (a:p:t:[]) = let threads = fromMaybe 0 $ Conf.convert t :: Int in
+                                      (And [Set NoMeaning (RuntimeParam $ "args:" ++ (fromMaybe "" $ Conf.convert a))
+                                           ,Set NoMeaning (RuntimeParam $ "numProcs: " ++ (show $ (fromMaybe 0 $ Conf.convert p :: Int)))
+                                           ,Set (Threads threads) (RuntimeParam $ "numThreads: " ++ (show $ threads))
+                                           ]
+                                      ): acc
         createSpaces acc _ = (And []) : acc
 
 addBuildMethods :: M.Map String String -> Config -> Config
