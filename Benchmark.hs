@@ -42,6 +42,9 @@ main = do
   -- Run the benchmarks.
   defaultMainModifyConfig $ configureBenchmarkSpace confMap
 
+  --TEMP - Process the results file to get the numCores
+  callCommand $ "./processResults.sh " ++ (getStringOrNothing confMap "resultsCsv")
+
     where getRepository cfg = do  r <- Conf.require cfg "hdphRepo"
                                   l <- Conf.require cfg "hdphInstallLoc"
                                   downloadRepository r l
@@ -50,8 +53,7 @@ configureBenchmarkSpace :: ConfMap -> Config -> Config
 configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (buildPathReg cfg) . addBenchmarks (configureBenches cfg)
   where dribbleLoc = getStringOrNothing cfg "resultsCsv"
         addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
-        addHarvesters c = c { harvesters =  customTagHarvesterDouble "Runtime"
-                                         <> harvesters c }
+        addHarvesters c = c { harvesters =  customTagHarvesterDouble "RUNTIME" <> harvesters c }
 
 configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
@@ -67,6 +69,7 @@ baseSpace cfg spc = if useMPI then And [ Set NoMeaning (CompileParam "--flags=Wi
                                        ]
                               else And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
                                        , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
+                                       ,spc
                                        ]
   where useMPI     = fromMaybe False   $ Conf.convert $ cfg HM.! "useMPI"
         hfile      = fromMaybe "hosts" $ Conf.convert $ HM.lookupDefault (Conf.String "hosts") "hostFile"  cfg
@@ -95,7 +98,9 @@ addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
                       }
 
 buildPathReg :: ConfMap -> M.Map String String
-buildPathReg cfg = M.fromList [("extra-packages", getStringOrNothing cfg "installArgs")]
+buildPathReg cfg = M.fromList [("extra-packages", getStringOrNothing cfg "installArgs"),
+                               ("ghc", getStringOrNothing cfg "ghcLoc")
+                              ]
 
 downloadRepository :: String -> FilePath -> IO ()
 downloadRepository rep loc = do
@@ -108,4 +113,4 @@ downloadRepository rep loc = do
 
 -- Config Helper functions.
 getStringOrNothing :: ConfMap -> Conf.Name -> String
-getStringOrNothing cfg s = fromMaybe "" $ Conf.convert $ cfg HM.! s
+getStringOrNothing cfg s = fromMaybe ""  $ Conf.convert $ HM.lookupDefault (Conf.String "") s cfg
