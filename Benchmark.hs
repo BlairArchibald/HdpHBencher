@@ -59,7 +59,7 @@ configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
   where hdphLocal    = getStringOrNothing cfg "hdphInstallLoc"
         benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
-        createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
+        createBenchmarkSpaces acc n = mkBenchmark ("/programs/Liouville") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
 
 baseSpace :: ConfMap -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace cfg spc = And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
@@ -107,7 +107,7 @@ downloadRepository rep branch loc = do
     False -> return ()
 
   case branch of
-    Just b  -> callCommand $ "git clone " ++ b ++ " " ++ rep ++ " " ++ loc
+    Just b  -> callCommand $ "git clone -b " ++ b ++ " " ++ rep ++ " " ++ loc
     Nothing -> callCommand $ "git clone " ++ rep ++ " " ++ loc
 
 -- Config Helper functions.
