@@ -23,8 +23,6 @@ import qualified Data.Configurator.Types as Conf
 import Data.Maybe
 import qualified Data.Text as T
 
-import Data.List.Split (splitOn)
-
 type ConfMap = HM.HashMap Conf.Name Conf.Value
 
 main :: IO ()
@@ -42,13 +40,15 @@ main = do
   -- Run the benchmarks.
   defaultMainModifyConfig $ configureBenchmarkSpace confMap
 
-  --TEMP - Process the results file to get the numCores
-  callCommand $ "./processResults.sh " ++ (getStringOrNothing confMap "resultsCsv")
+  --TODO: Move this into HsBencher - Process the results file to get the numCores
+  --callCommand $ "./processResults.sh " ++ (getStringOrNothing confMap "resultsCsv")
 
     where getRepository cfg = do  r <- Conf.require cfg "hdphRepo"
                                   l <- Conf.require cfg "hdphInstallLoc"
-                                  downloadRepository r l
+                                  b <- Conf.lookup cfg  "hdphBranch"
+                                  downloadRepository r b l
 
+-- TODO: Use a reader monad to thread through the configuration.
 configureBenchmarkSpace :: ConfMap -> Config -> Config
 configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (buildPathReg cfg) . addBenchmarks (configureBenches cfg)
   where dribbleLoc = getStringOrNothing cfg "resultsCsv"
@@ -62,17 +62,11 @@ configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
         createBenchmarkSpaces acc n = mkBenchmark (hdphLocal ++ "/hdph/") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
 
 baseSpace :: ConfMap -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
-baseSpace cfg spc = if useMPI then And [ Set NoMeaning (CompileParam "--flags=WithMPI")
-                                       , Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
-                                       , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
-                                       ,spc
-                                       ]
-                              else And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
-                                       , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
-                                       ,spc
-                                       ]
-  where useMPI     = fromMaybe False   $ Conf.convert $ cfg HM.! "useMPI"
-        hfile      = fromMaybe "hosts" $ Conf.convert $ HM.lookupDefault (Conf.String "hosts") "hostFile"  cfg
+baseSpace cfg spc = And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
+                        , Set NoMeaning (RuntimeParam ("interface:" ++ interface))
+                        ,spc
+                        ]
+  where hfile      = fromMaybe "hosts" $ Conf.convert $ HM.lookupDefault (Conf.String "hosts") "hostFile"  cfg
         interface  = fromMaybe "eth0"  $ Conf.convert $ HM.lookupDefault (Conf.String "eth0")  "interface" cfg
 
 generateBenchmarkSpaces :: ConfMap -> T.Text -> BenchSpace DefaultParamMeaning
@@ -98,18 +92,23 @@ addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
                       }
 
 buildPathReg :: ConfMap -> M.Map String String
-buildPathReg cfg = M.fromList [("extra-packages", getStringOrNothing cfg "installArgs"),
-                               ("ghc", getStringOrNothing cfg "ghcLoc")
+buildPathReg cfg = M.fromList [
+  ("extra-packages", getStringOrNothing cfg "extraSandboxPackages"),
+  ("ghc", getStringOrNothing cfg "ghcLoc")
                               ]
 
-downloadRepository :: String -> FilePath -> IO ()
-downloadRepository rep loc = do
+downloadRepository :: String -> Maybe String -> FilePath -> IO ()
+downloadRepository rep branch loc = do
   e <- doesDirectoryExist loc
   case e of
-    True  -> putStrLn ("Removing existing repository at " ++ loc) >> removeDirectoryRecursive loc
+    True  -> do
+      putStrLn ("Removing existing repository at " ++ loc)
+      removeDirectoryRecursive loc
     False -> return ()
 
-  callCommand $ "git clone " ++ rep ++ " " ++ loc
+  case branch of
+    Just b  -> callCommand $ "git clone " ++ b ++ " " ++ rep ++ " " ++ loc
+    Nothing -> callCommand $ "git clone " ++ rep ++ " " ++ loc
 
 -- Config Helper functions.
 getStringOrNothing :: ConfMap -> Conf.Name -> String

@@ -65,9 +65,9 @@ hdphMethod = BuildMethod
        let additionalPackages = M.lookup "extra-packages" pathRegistry
        case additionalPackages of
          Just p  -> let pkgs = splitOn ":" p in
-                        forM_ pkgs $ \p -> do
-                          log $ tag ++ "Installing " ++ p ++ " into the cabal sandbox"
-                          let cmd = cabalPath ++ " install " ++ p ++ " " ++ unwords flags
+                        forM_ pkgs $ \pkg -> do
+                          log $ tag ++ "Installing " ++ pkg ++ " into the cabal sandbox"
+                          let cmd = cabalPath ++ " install " ++ pkg ++ " " ++ unwords flags
                           runSuccessful tag cmd
          Nothing -> return ()
 
@@ -89,7 +89,8 @@ hdphMethod = BuildMethod
                  interface = lookupArg "interface" args
               in CommandDescr
                {
-                --TODO: Remove the hardcoded nic and possibly get num procs from the thread settings.
+                --TODO: There should be a better way of passing all this
+                --information.
                 command = ShellCommand
                             ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " " ++ bin ++ " " ++ prog_args
                             ++ " +HdpH numProcs=" ++ numProcs ++ " nic=" ++ interface ++ " -HdpH "
@@ -106,7 +107,7 @@ hdphMethod = BuildMethod
    dotcab = WithExtension ".cabal"
    tag = " [HdpHMethod] "
    lookupArg a args = trim . stripColon . head $ filter (\f -> f =~ (a ++ ":.*") :: Bool) args
-   stripColon s = let (b,w,a) = s =~ ":" :: (String,String,String) in a
+   stripColon s = let (_,_,a) = s =~ ":" :: (String,String,String) in a
 
 --------------------------------------------------------------------------------
 -- Helper routines: From the HsBencher built ins. (Not exported but I needed them)
@@ -141,14 +142,6 @@ inDirectory dir act = do
   --             return o)
   --         (\orig -> liftIO$ setCurrentDirectory orig)
   --         (\_ -> act)
-
--- Returns actual files only
-filesInDir :: FilePath -> IO [FilePath]
-filesInDir d = do
-  inDirectory d $ do
-    ls <- getDirectoryContents "."
-    filterM doesFileExist ls
-
 
 -- | A simple wrapper for a command that is expected to succeed (and whose output we
 -- don't care about).  Throws an exception if the command fails.
