@@ -67,7 +67,7 @@ hdphMethod = BuildMethod
          Just p  -> let pkgs = splitOn ":" p in
                         forM_ pkgs $ \pkg -> do
                           log $ tag ++ "Installing " ++ pkg ++ " into the cabal sandbox"
-                          let cmd = cabalPath ++ " install " ++ pkg ++ " " ++ unwords flags
+                          let cmd = cabalPath ++ " sandbox add-source " ++  pkg
                           runSuccessful tag cmd
          Nothing -> return ()
 
@@ -90,10 +90,16 @@ hdphMethod = BuildMethod
               in CommandDescr
                {
                 --TODO: There should be a better way of passing all this
-                --information.
+                --information, or atleast validating it's all there.
+                --TODO: different mpi programs have different command line
+                --args. Have a way of moving between them both.
                 command = ShellCommand
-                            ("mpiexec -launcher ssh -f " ++ hosts ++ " -n " ++ numProcs ++ " " ++ bin ++ " " ++ prog_args
-                            ++ " +HdpH numProcs=" ++ numProcs ++ " nic=" ++ interface ++ " -HdpH "
+                            ("mpiexec -hostfile " ++ hosts
+                            ++ " -n " ++ numProcs
+                            ++ " " ++ bin ++ " " ++ prog_args
+                            ++ " +HdpH numProcs=" ++ numProcs
+                            ++ " nic=" ++ interface
+                            ++ " -HdpH "
                             ++ "+RTS -N" ++ threads ++ " -RTS")
                ,envVars = envVars
                ,timeout = runTimeOut

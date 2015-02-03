@@ -55,11 +55,12 @@ configureBenchmarkSpace cfg = addPlugins . addHarvesters . addBuildMethods  (bui
         addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
         addHarvesters c = c { harvesters =  customTagHarvesterDouble "RUNTIME" <> harvesters c }
 
+--TODO: Need to specify the benchmark dir in config line so we can support
+-- multiple directories.
 configureBenches :: ConfMap -> [Benchmark DefaultParamMeaning]
 configureBenches cfg = foldl createBenchmarkSpaces [] benchmarkList
-  where hdphLocal    = getStringOrNothing cfg "hdphInstallLoc"
-        benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
-        createBenchmarkSpaces acc n = mkBenchmark ("/programs/Liouville") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
+  where benchmarkList= fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
+        createBenchmarkSpaces acc n = mkBenchmark ("./programs/Liouville/") [] (baseSpace cfg $ generateBenchmarkSpaces cfg n) : acc
 
 baseSpace :: ConfMap -> BenchSpace DefaultParamMeaning -> BenchSpace DefaultParamMeaning
 baseSpace cfg spc = And [ Set NoMeaning (RuntimeParam ("hostFile:" ++ hfile))
@@ -86,7 +87,7 @@ generateBenchmarkSpaces cfg bname = And [Set NoMeaning (RuntimeParam $ "bin:" ++
 
 addBuildMethods :: M.Map String String -> Config -> Config
 addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
-                      ,doClean      = True
+                      ,doClean      = False
                       -- Slight hack to pass the local install information into the sandbox compile stage.
                       ,pathRegistry = pathRegistry c `M.union` pathReg
                       }
