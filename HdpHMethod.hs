@@ -9,6 +9,7 @@ import Control.Monad
 import Control.Monad.Reader
 
 import Text.Regex.Posix
+import Data.List (intercalate)
 import Data.List.Split (splitOn)
 
 import qualified Data.ByteString.Char8 as B
@@ -19,6 +20,8 @@ import System.Directory
 import System.FilePath
 import Text.Printf
 import Prelude hiding (log)
+
+import Debug.Trace
 
 -- HdpH method is a modified cabal method to support sandboxes and mpiexec runs.
 hdphMethod :: BuildMethod
@@ -81,26 +84,15 @@ hdphMethod = BuildMethod
        -- could pass these in as a map but HsBencher isn't currently set up to
        -- do this.
        let runit args envVars =
-             let bin       = tmpdir </> lookupArg "bin" args ++ suffix
-                 prog_args = lookupArg "args" args
-                 hosts     = benchroot </> lookupArg "hostFile" args
-                 numProcs  = lookupArg "numProcs" args
-                 threads   = lookupArg "numThreads" args
-                 interface = lookupArg "interface" args
+             let bin         = tmpdir </> lookupArg "Bin" args ++ suffix
+                 progArgs    = lookupArg "ProgArgs" args
+                 hdpHArgs    = lookupArg "HdpHArgs" args
+                 mpiExecArgs = lookupArg "MPIExecArgs" args
+                 rtsArgs     = lookupArg "RTSArgs" args
               in CommandDescr
                {
-                --TODO: There should be a better way of passing all this
-                --information, or atleast validating it's all there.
-                --TODO: different mpi programs have different command line
-                --args. Have a way of moving between them both.
-                command = ShellCommand
-                            ("mpiexec -hostfile " ++ hosts
-                            ++ " -n " ++ numProcs
-                            ++ " " ++ bin ++ " " ++ prog_args
-                            ++ " +HdpH numProcs=" ++ numProcs
-                            ++ " nic=" ++ interface
-                            ++ " -HdpH "
-                            ++ "+RTS -N" ++ threads ++ " -RTS")
+                command = ShellCommand $
+                  "mpiexec " ++ (intercalate " " [mpiExecArgs, bin, progArgs, hdpHArgs, rtsArgs])
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir
