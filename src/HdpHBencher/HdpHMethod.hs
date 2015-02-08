@@ -1,5 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module HdpHMethod (hdphMethod) where
+module HdpHBencher.HdpHMethod (hdphMethod) where
 
 import HSBencher.Types
 import HSBencher.Internal.Logging (log)
@@ -18,10 +18,7 @@ import qualified Data.Map as M
 import System.Process
 import System.Directory
 import System.FilePath
-import Text.Printf
 import Prelude hiding (log)
-
-import Debug.Trace
 
 -- HdpH method is a modified cabal method to support sandboxes and mpiexec runs.
 hdphMethod :: BuildMethod

@@ -3,34 +3,38 @@
 
 name:                HdpHBencher
 version:             0.1.0.0
-synopsis:            Haskell distributed parallel haskell benchmarking
-description:         Tooling to support benchmarking/performance regression testing for HdpH.
+synopsis:            Haskell distributed parallel haskell (HdpH) benchmarking
+                     framework
+description:         Tooling to support benchmarking for HdpH.
 license:             BSD3
 license-file:        LICENSE
 author:              Blair Archibald
-maintainer:          b.archibald.1@research.dcs.gla.ac.uk
-copyright:           Blair Archibald - 2014
+maintainer:          mrblairarchbald@gmail.com
+copyright:           Blair Archibald - 2014/2015
 category:            Benchmarking
 build-type:          Simple
-extra-source-files:  README.markdown
+-- extra-source-files:
 cabal-version:       >=1.10
 
 executable HdpHBencher
-  main-is:             HdpHBencher.hs
-  other-modules:
-  build-depends:       base        >= 4.6      && <4.9,
-                       hsbencher   >= 1.14     && <1.15,
-                       filepath    >= 1.3      && <1.4,
-                       directory   >= 1.2      && <1.3,
-                       process     >= 1.2      && <1.3,
-                       containers  >= 0.5      && <0.6,
-                       mtl         >= 2.1      && <2.2,
-                       bytestring  >= 0.10     && <1.0,
-                       regex-posix >= 0.93     && <1.0,
-                       split       >= 0.2      && <0.3,
-                       configurator>= 0.3      && <0.4,
-                       MissingH    >= 1.3      && <1.4,
-                       text        >= 1.2      && <1.3,
-                       unordered-containers >= 0.2.5 && < 0.2.6
-  hs-source-dirs:      .
+  main-is:               HdpHBencher.hs
+
+  other-modules:         HdpHBencher.BenchmarkConfig
+                       , HdpHBencher.HdpHMethod
+
+  build-depends:         base        >= 4.6            && <4.9
+                       , hsbencher   >= 1.14           && <1.15
+                       , filepath    >= 1.3            && <1.4
+                       , directory   >= 1.2            && <1.3
+                       , process     >= 1.2            && <1.3
+                       , containers  >= 0.5            && <0.6
+                       , mtl         >= 2.1            && <2.2
+                       , bytestring  >= 0.10           && <1.0
+                       , regex-posix >= 0.93           && <1.0
+                       , split       >= 0.2            && <0.3
+                       , configurator>= 0.3            && <0.4
+                       , MissingH    >= 1.3            && <1.4
+                       , text        >= 1.2            && <1.3
+                       , unordered-containers >= 0.2.5 && < 0.2.6
+  hs-source-dirs:      src/
   default-language:    Haskell2010

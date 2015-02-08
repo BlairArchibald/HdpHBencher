@@ -8,7 +8,9 @@
 import HSBencher
 import HSBencher.Backend.Dribble
 
-import HdpHMethod
+import HdpHBencher.BenchmarkConfig
+
+import HdpHBencher.HdpHMethod
 
 import System.Process (callCommand)
 import System.Directory
