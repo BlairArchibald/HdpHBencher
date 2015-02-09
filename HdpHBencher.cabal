@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                HdpHBencher
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Haskell distributed parallel haskell (HdpH) benchmarking
                      framework
 description:         Tooling to support benchmarking for HdpH.

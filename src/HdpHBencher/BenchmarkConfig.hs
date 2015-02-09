@@ -25,11 +25,10 @@ module HdpHBencher.BenchmarkConfig
   , getConfValueOrFail
 ) where
 
-import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 
-import qualified Data.Text as T (append, Text(..))
-import qualified Data.HashMap.Strict as HM (lookup, HashMap(..))
+import qualified Data.Text as T (append, Text)
+import qualified Data.HashMap.Strict as HM (lookup, HashMap)
 
 import Data.Configurator ()
 import Data.Configurator.Types (convert, Configured, Name, Value)
@@ -134,7 +133,7 @@ constructBaseConfig cfg =
           {
             hdphNumProcs       = fromMaybe 0 $ getConfValueOrNothing "numProcs" cfg
           , interface          = getConfValueOrNothing "interface" cfg
-          , tcpStartup         = maybe False id $ getConfValueOrNothing "tcpStartup" cfg
+          , tcpStartup         = fromMaybe False $ getConfValueOrNothing "tcpStartup" cfg
           , startupHost        = getConfValueOrNothing "startupHost" cfg
           , startupPort        = getConfValueOrNothing "startupPort" cfg
           , hdphAdditionalArgs = getConfValueOrNothing "globalHdpHArgs" cfg
@@ -243,7 +242,7 @@ buildMPIExecArgString cfg = collapseArgs printArgs
 
 -- Utility Functions
 collapseArgs :: [String] -> String
-collapseArgs = intercalate " " . filter (/= "")
+collapseArgs = unwords . filter (/= "")
 
 getConfValueOrNothing :: Configured a =>  Name -> ConfMap -> Maybe a
 getConfValueOrNothing s m = case s `HM.lookup` m of

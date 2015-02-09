@@ -15,8 +15,6 @@ import HdpHBencher.HdpHMethod
 import System.Process (callCommand)
 import System.Directory
 
-import Data.List (intercalate)
-
 import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.HashMap.Strict as HM
@@ -31,10 +29,6 @@ type ConfMap = HM.HashMap Conf.Name Conf.Value
 
 type BenchmarkName = T.Text
 
-
--- Collapse a list of string with possible nulls into a single space seperated
--- string.
-
 -- Main benchmark runner
 main :: IO ()
 main = do
@@ -44,7 +38,7 @@ main = do
   cfg <- Conf.load [Conf.Required "benchmark.conf"]
 
   -- Download the code under test.
-  --getRepository cfg
+  getRepository cfg
 
   confMap <- Conf.getMap cfg
 
@@ -62,10 +56,11 @@ main = do
 
 -- Benchmark Configuration Functions
 configureBenchmarkSpace :: ConfMap -> BenchmarkConfig -> Config -> Config
-configureBenchmarkSpace cfg baseConf = addPlugins
-                                     . addHarvesters
-                                     . addBuildMethods (buildPathReg cfg)
-                                     . addBenchmarks (configureBenches cfg baseConf)
+configureBenchmarkSpace cfg baseConf =
+   addPlugins
+ . addHarvesters
+ . addBuildMethods (buildPathReg cfg)
+ . addBenchmarks (configureBenches cfg baseConf)
   where
     addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
     dribbleLoc = fromMaybe "" $ getConfValueOrNothing "resultsCsv" cfg
@@ -76,34 +71,47 @@ configureBenchmarkSpace cfg baseConf = addPlugins
 
 configureBenches :: ConfMap -> BenchmarkConfig -> [Benchmark DefaultParamMeaning]
 configureBenches cfg baseConf = map addBenchmark benchmarkList
-  where benchmarkList = fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks" :: [T.Text]
+  where benchmarkList :: [BenchmarkName]
+        benchmarkList = fromMaybe [""] $ Conf.convert $ cfg HM.! "benchmarks"
         addBenchmark  = configureBenchmark cfg baseConf
 
-configureBenchmark :: ConfMap -> BenchmarkConfig -> BenchmarkName -> Benchmark DefaultParamMeaning
+configureBenchmark :: ConfMap
+                  -> BenchmarkConfig
+                  -> BenchmarkName
+                  -> Benchmark DefaultParamMeaning
 configureBenchmark cfg baseConf bname =
   let conf = updateConf baseConf cfg bname in
       mkBenchmark (binaryLoc (runConf conf)) [] $
-        And [  Set NoMeaning (RuntimeParam ("HdpHArgs:"    ++ (buildHdpHArgString (hdphConf conf))))
-             , Set NoMeaning (RuntimeParam ("MPIExecArgs:" ++ (buildMPIExecArgString (mpiExecConf conf))))
-             , Set NoMeaning (RuntimeParam ("RTSArgs:"     ++ (buildRTSArgString (rtsConf conf))))
-             , Set NoMeaning (RuntimeParam ("Bin:"         ++ (binaryName (runConf conf))))
-             , Set NoMeaning (RuntimeParam ("ProgArgs:"    ++ (fromMaybe "" $ benchmarkArgs (runConf conf))))
+        And [  Set NoMeaning (RuntimeParam
+                ("HdpHArgs:" ++ (buildHdpHArgString (hdphConf conf))))
+             , Set NoMeaning (RuntimeParam
+                ("MPIExecArgs:" ++ (buildMPIExecArgString (mpiExecConf conf))))
+             , Set NoMeaning (RuntimeParam
+                ("RTSArgs:"  ++ (buildRTSArgString (rtsConf conf))))
+             , Set NoMeaning (RuntimeParam
+                ("Bin:"      ++ (binaryName (runConf conf))))
+             , Set NoMeaning (RuntimeParam
+                ("ProgArgs:" ++ (fromMaybe "" $ benchmarkArgs (runConf conf))))
              ]
 
 addBuildMethods :: M.Map String String -> Config -> Config
-addBuildMethods pathReg c = c {buildMethods = [hdphMethod]
-                              ,doClean      = False
-                              -- Slight hack to pass the local install information into the sandbox compile stage.
-                              ,pathRegistry = pathRegistry c `M.union` pathReg
-                              }
+addBuildMethods pathReg config =
+  config
+    { buildMethods = [hdphMethod]
+    , doClean      = False
+    -- Hack to pass the local install information into the sandbox compile stage.
+    , pathRegistry = pathRegistry config `M.union` pathReg
+    }
 
 buildPathReg :: ConfMap -> M.Map String String
 buildPathReg cfg = M.fromList
-    [
-      ("extra-packages", fromMaybe "" $ getConfValueOrNothing "extraSandboxPackages" cfg),
-      ("ghc", fromMaybe "" $ getConfValueOrNothing "ghcLoc" cfg)
-    ]
+   [
+     ("extra-packages", fromMaybe "" $
+       getConfValueOrNothing "extraSandboxPackages" cfg)
+   , ("ghc", fromMaybe "" $ getConfValueOrNothing "ghcLoc" cfg)
+   ]
 
+-- TODO: Only delete the repository if it's out of date.
 downloadRepository :: String -> Maybe String -> FilePath -> IO ()
 downloadRepository rep branch loc = do
   e <- doesDirectoryExist loc
