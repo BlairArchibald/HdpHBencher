@@ -171,9 +171,18 @@ updateConf baseConf cfg bname =
         }
   where
     addPrefix = T.append (bname `T.append` ".")
-    updateMaybeConf s cur = case cur of
-                             Nothing -> getConfValueOrNothing (addPrefix s) cfg
-                             Just x  -> Just x
+    updateMaybeConf s cur =
+      case cur of
+       Nothing -> getConfValueOrNothing (addPrefix s) cfg
+       Just x  -> Just x
+
+    appendMaybeConf s cur =
+      case cur of
+       Nothing -> getConfValueOrNothing (addPrefix s) cfg
+       Just x  -> let val = getConfValueOrNothing (addPrefix s) cfg in
+                      case val of
+                        Nothing -> Just x
+                        Just v  -> Just (x ++ v)
 
     updateRunConf c =
       c { binaryLoc     = getConfValueOrFail (addPrefix "binLoc") cfg
@@ -192,13 +201,13 @@ updateConf baseConf cfg bname =
                                 (getConfValueOrNothing (addPrefix "tcpStartup") cfg)
         , startupHost        = updateMaybeConf "startupHost" (startupHost c)
         , startupPort        = updateMaybeConf "startupPort" (startupPort c)
-        , hdphAdditionalArgs = updateMaybeConf "globalHdpHArgs" (hdphAdditionalArgs c)
+        , hdphAdditionalArgs = appendMaybeConf "hdphArgs" (hdphAdditionalArgs c)
         }
 
     updateRTSConf c =
       c {
           numThreads       = updateMaybeConf "numThreads" (numThreads c)
-        , rtsAdditonalArgs = updateMaybeConf "globalRTSArgs" (rtsAdditonalArgs c)
+        , rtsAdditonalArgs = appendMaybeConf "rtsArgs" (rtsAdditonalArgs c)
         }
 
     updateMPIExecConf c =
@@ -207,7 +216,7 @@ updateConf baseConf cfg bname =
                           (mpiNumProcs c)
                           (getConfValueOrNothing (addPrefix "numProcs") cfg)
         , hostFile         = updateMaybeConf "hostsFile" (hostFile c)
-        , mpiAdditonalArgs = updateMaybeConf "MPIExecAdditionalArgs" (mpiAdditonalArgs c)
+        , mpiAdditonalArgs = appendMaybeConf "mpiExecAdditionalArgs" (mpiAdditonalArgs c)
         }
 
 
