@@ -182,7 +182,7 @@ updateConf baseConf cfg bname =
        Just x  -> let val = getConfValueOrNothing (addPrefix s) cfg in
                       case val of
                         Nothing -> Just x
-                        Just v  -> Just (x ++ v)
+                        Just v  -> Just (x ++ " " ++ v)
 
     updateRunConf c =
       c { binaryLoc     = getConfValueOrFail (addPrefix "binLoc") cfg
