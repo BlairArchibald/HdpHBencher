@@ -50,6 +50,7 @@ data BenchmarkRunConf =
     { binaryLoc     :: FilePath
     , binaryName    :: String
     , benchmarkArgs :: Maybe String
+    , variant       :: String
     }
     deriving (Show)
 
@@ -89,6 +90,7 @@ defaultBenchmarkRunConf =
     { binaryLoc     = ""
     , binaryName    = ""
     , benchmarkArgs = Nothing
+    , variant       = ""
     }
 
 defaultHpdHConf :: HdpHConf
@@ -188,6 +190,8 @@ updateConf baseConf cfg bname =
       c { binaryLoc     = getConfValueOrFail (addPrefix "binLoc") cfg
         , binaryName    = getConfValueOrFail (addPrefix "binName") cfg
         , benchmarkArgs = updateMaybeConf "args" (benchmarkArgs c)
+        , variant       = fromMaybe "" $
+                            getConfValueOrNothing (addPrefix "variant") cfg
         }
 
     updateHdpHConf c =

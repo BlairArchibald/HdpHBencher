@@ -86,7 +86,7 @@ configureBenchmark cfg baseConf bname =
                 ("RTSArgs:"  ++ (buildRTSArgString (rtsConf conf))))
              , Set NoMeaning (RuntimeParam
                 ("Bin:"      ++ (binaryName (runConf conf))))
-             , Set NoMeaning (RuntimeParam
+             , Set (Variant (variant (runConf conf))) (RuntimeParam
                 ("ProgArgs:" ++ (fromMaybe "" $ benchmarkArgs (runConf conf))))
              ]
 
