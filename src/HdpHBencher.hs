@@ -58,15 +58,11 @@ main = do
 configureBenchmarkSpace :: ConfMap -> BenchmarkConfig -> Config -> Config
 configureBenchmarkSpace cfg baseConf =
    addPlugins
- . addHarvesters
- . addBuildMethods (buildPathReg cfg)
+ . updateHsBencherConf cfg
  . addBenchmarks (configureBenches cfg baseConf)
   where
     addPlugins = addPlugin defaultDribblePlugin (DribbleConf $ Just dribbleLoc)
     dribbleLoc = fromMaybe "" $ getConfValueOrNothing "resultsCsv" cfg
-    --TODO: Harvesters from config file.
-    addHarvesters c = c { harvesters = customTagHarvesterDouble "RUNTIME"
-                          <> harvesters c }
 
 
 configureBenches :: ConfMap -> BenchmarkConfig -> [Benchmark DefaultParamMeaning]
@@ -94,13 +90,19 @@ configureBenchmark cfg baseConf bname =
                 ("ProgArgs:" ++ (fromMaybe "" $ benchmarkArgs (runConf conf))))
              ]
 
-addBuildMethods :: M.Map String String -> Config -> Config
-addBuildMethods pathReg config =
+updateHsBencherConf :: ConfMap -> Config -> Config
+updateHsBencherConf cfm config =
   config
     { buildMethods = [hdphMethod]
     , doClean      = False
+    , keepgoing    = True
+    , trials       = fromMaybe 1 $ getConfValueOrNothing "samples" cfm
+
+    --TODO: Harvesters from config?
+    , harvesters   = customAccumHarvesterDouble "RUNTIME" <> harvesters config
+
     -- Hack to pass the local install information into the sandbox compile stage.
-    , pathRegistry = pathRegistry config `M.union` pathReg
+    , pathRegistry = pathRegistry config `M.union` buildPathReg cfm
     }
 
 buildPathReg :: ConfMap -> M.Map String String
