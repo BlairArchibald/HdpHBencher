@@ -89,7 +89,13 @@ hdphMethod = BuildMethod
               in CommandDescr
                {
                 command = ShellCommand $
-                  "mpiexec " ++ (intercalate " " [mpiExecArgs, bin, progArgs, hdpHArgs, rtsArgs])
+                  "mpiexec " ++ (intercalate " " [ mpiExecArgs
+                                                 , bin
+                                                 , progArgs
+                                                 , hdpHArgs
+                                                 , rtsArgs])
+                    --Makes sure we let the old programs die before continuing
+                             ++ ";sleep 4"
                ,envVars = envVars
                ,timeout = runTimeOut
                ,workingDir = Just tmpdir
