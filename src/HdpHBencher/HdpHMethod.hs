@@ -36,7 +36,7 @@ hdphMethod = BuildMethod
       liftIO $ do b <- doesDirectoryExist sandBoxDir
                   when b $ removeDirectoryRecursive sandBoxDir
 
-  , compile = \ Config{pathRegistry, runTimeOut} bldid flags target -> do
+  , compile = \ Config{pathRegistry, runTimeOut} bldid flags buildEnv target -> do
 
      benchroot <- liftIO$ getCurrentDirectory
      let suffix = "_" ++ bldid
@@ -48,8 +48,8 @@ hdphMethod = BuildMethod
      dir <- liftIO $ getDir target -- Where the indiv benchmark lives.
      inDirectory dir $ do
        let tmpdir = benchroot </> dir </> "temp" ++ suffix
-       _ <- runSuccessful tag $ "rm -rf " ++ tmpdir
-       _ <- runSuccessful tag $ "mkdir "  ++ tmpdir
+       _ <- runSuccessful tag ("rm -rf " ++ tmpdir) []
+       _ <- runSuccessful tag ("mkdir "  ++ tmpdir) []
        log $ tag ++ " Switched to " ++ dir ++ ", and cleared temporary directory."
 
        let cmdSetup = cabalPath ++ " sandbox init"
@@ -59,7 +59,7 @@ hdphMethod = BuildMethod
 
        -- Setup a sandbox
        log$ tag++ " Setting up cabal sandbox " ++cmd1
-       _ <- runSuccessful tag cmdSetup
+       _ <- runSuccessful tag cmdSetup buildEnv
 
        -- Install any local dependencies first
        let additionalPackages = M.lookup "extra-packages" pathRegistry
@@ -68,14 +68,14 @@ hdphMethod = BuildMethod
                         forM_ pkgs $ \pkg -> do
                           log $ tag ++ "Installing " ++ pkg ++ " into the cabal sandbox"
                           let cmd = cabalPath ++ " sandbox add-source " ++  pkg
-                          runSuccessful tag cmd
+                          runSuccessful tag cmd buildEnv
          Nothing -> return ()
 
        -- Install the main package that we are testing.
        log $ tag ++ "Running cabal command for deps only: " ++ cmd1
-       _ <- runSuccessful tag cmd1
+       _ <- runSuccessful tag cmd1 buildEnv
        log $ tag ++ "Running cabal command to build benchmark: " ++ cmd2
-       _ <- runSuccessful tag cmd2
+       _ <- runSuccessful tag cmd2 buildEnv
 
        -- We filter the information from runtime flags. Would be nicer if we
        -- could pass these in as a map but HsBencher isn't currently set up to
@@ -141,9 +141,9 @@ inDirectory dir act = do
 -- | A simple wrapper for a command that is expected to succeed (and whose output we
 -- don't care about).  Throws an exception if the command fails.
 -- Returns lines of output if successful.
-runSuccessful :: String -> String -> BenchM [B.ByteString]
-runSuccessful tag cmd = do
-  (res,lns) <- runLogged tag cmd
+runSuccessful :: String -> String -> EnvVars -> BenchM [B.ByteString]
+runSuccessful tag cmd env = do
+  (res,lns) <- runLogged tag cmd env
   case res of
     ExitError code  -> error$ "expected this command to succeed! But it exited with code "++show code++ ":\n  "++ cmd
     RunTimeOut {}   -> error$ "Methods.hs/runSuccessful - error! The following command timed out:\n  "++show cmd
